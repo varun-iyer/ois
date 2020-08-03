@@ -1,7 +1,7 @@
 #include "oistools.h"
 
-double multiply_and_sum(size_t nsize, double* C1, double* C2);
-double multiply_and_sum_mask(size_t nsize, double* C1, double* C2, char* mask);
+extern double multiply_and_sum(size_t nsize, double* C1, double* C2);
+extern double multiply_and_sum_mask(size_t nsize, double* C1, double* C2, char* mask);
 void fill_c_matrices_for_kernel(int k_height, int k_width, int deg, int n, int m, double* refimage, double* Conv);
 void fill_c_matrices_for_background(int n, int m, int bkg_deg, double* Conv_bkg);
 
@@ -29,6 +29,8 @@ lin_system build_matrix_system(int n, int m, double* image, double* refimage,
     }
 
     //Create matrices M and vector b
+	// Everything below should be done fully on the GPU to minimize number of 
+	// transfers
     int total_dof = kernel_size * poly_degree + bkg_dof;
 	size_t M_size = ((size_t) total_dof) * total_dof * sizeof(double);
 	size_t b_size = ((size_t) total_dof) * sizeof(double);
@@ -104,23 +106,6 @@ void convolve2d_adaptive(int n, int m, double* image,
         } // conv_col
     } // conv_row
 
-}
-
-double multiply_and_sum(size_t nsize, double* C1, double* C2) {
-    double result = 0.0;
-    for (size_t i = 0; i < nsize; i++) {
-        result += C1[i] * C2[i];
-    }
-    return result;
-}
-
-
-double multiply_and_sum_mask(size_t nsize, double* C1, double* C2, char* mask) {
-    double result = 0.0;
-    for (size_t i = 0; i < nsize; i++) {
-        if (mask[i] == 0) result += C1[i] * C2[i];
-    }
-    return result;
 }
 
 void fill_c_matrices_for_kernel(int k_height, int k_width, int deg, int n, int m, double* refimage, double* Conv) {
