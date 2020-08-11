@@ -14,7 +14,8 @@ cuda = True
 varconv = Extension('varconv',
                     sources=['src/varconv.c', 'src/oistools.c', 'src/mat.c'],
                     include_dirs = ['src'],
-                    libraries = ['m', 'nvlib/mat.so'],
+                    runtime_libraries = ['nvmas'],
+                    libraries = ['m', 'nvmas'],
                     extra_compile_args=["-std=c99",
                         "-DCUDA={}".format(1 if cuda else 0)]
 
