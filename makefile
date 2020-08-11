@@ -17,10 +17,10 @@ src/obj/test_ois_tools.o: src/tests/test_ois_tools.c src/tests/test_ois_tools.h 
 	$(CC) $(CFLAGS) -I$(SRC_DIR) -c $(TEST_DIR)/test_ois_tools.c -o $(OBJ_DIR)/test_ois_tools.o
 
 src/obj/oistools.o: src/oistools.c src/oistools.h $(OBJ_DIR)
-	$(CC) $(CFLAGS) -c src/oistools.c -o $(OBJ_DIR)/oistools.o
+	$(CC) $(CFLAGS) -c src/oistools.c -o $(OBJ_DIR)/oistools.o -L./nvlib -lnvmas
 
 testois: $(OBJ) src/tests/test_main.c
-	$(CC) $(CFLAGS) -I$(SRC_DIR) -I$(TEST_DIR) $(OBJ) $(TEST_DIR)/test_main.c -lm -o testois
+	$(CC) $(CFLAGS) -I$(SRC_DIR) -I$(TEST_DIR) $(OBJ) $(TEST_DIR)/test_main.c -lm -o testois -L./nvlib -lnvmas
 
 test:
 	./testois
