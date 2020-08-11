@@ -1,11 +1,24 @@
 CC=nvcc
-SRCS=mat.cu
-CFLAGS= \
---shared \
---compiler-options '-fPIC'
 
-mat.so : $(SRCS)
-	$(CC) $(CFLAGS) $^ -o $@
+NVFLAGS = \
+-arch=sm_61 \
+-Xcompiler '-fPIC'
+
+NVLFLAGS = \
+	-shared \
+	-L .
+
+main : test.c libnvmas.so
+	g++ -L. -o $@ $< -lnvmas
+
+libnvmas.so : nvmas.o libdevice.a
+	$(CC) $(NVFLAGS) $(NVLFLAGS) -ldevice $< -o $@
+
+libdevice.a : device.o
+	$(CC) $(NVFLAGS) -lib $^ -o $@
+
+%.o : %.cu
+	$(CC) $(NVFLAGS) -dc $^
 
 clean:
-	rm -rf *.so
+	rm *.o *.so *.a main
