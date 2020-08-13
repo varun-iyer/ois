@@ -1,12 +1,10 @@
 #include "device.h"
 #include "nvmas.h"
 
-#define MAX_THREADS 128
-
 extern "C" double multiply_and_sum(size_t nsize, double* h_C1, double* h_C2) {
 	size_t size = nsize * sizeof(double);
 
-	int threads =(nsize < MAX_THREADS) ? nsize : MAX_THREADS; // threads p block
+	int threads = nsize;
 	int blocks = nsize / threads; // number of blocks
 	dim3 dimBlock(threads, 1, 1);
 	dim3 dimGrid(blocks, 1, 1);
@@ -29,7 +27,7 @@ extern "C" double multiply_and_sum(size_t nsize, double* h_C1, double* h_C2) {
 	else todo = 0;
 
 	for(int i = 0; i < todo; i++) {
-		threads = (blocks < MAX_THREADS) ? blocks : MAX_THREADS;
+		threads = (blocks < nsize) ? blocks : nsize;
 		blocks = blocks / threads;
 		dim3 dimBlock(threads, 1, 1);
 		dim3 dimGrid(blocks, 1, 1);
@@ -47,7 +45,7 @@ extern "C" double multiply_and_sum(size_t nsize, double* h_C1, double* h_C2) {
 extern "C" double multiply_and_sum_mask(size_t nsize, double* h_C1, double* h_C2, char *h_m) {
 	size_t size = nsize * sizeof(double);
 
-	int threads =(nsize < MAX_THREADS) ? nsize : MAX_THREADS; // threads p block
+	int threads = nsize;
 	int blocks = nsize / threads; // number of blocks
 	dim3 dimBlock(threads, 1, 1);
 	dim3 dimGrid(blocks, 1, 1);
@@ -73,7 +71,7 @@ extern "C" double multiply_and_sum_mask(size_t nsize, double* h_C1, double* h_C2
 	else todo = 0;
 
 	for(int i = 0; i < todo; i++) {
-		threads = (blocks < MAX_THREADS) ? blocks : MAX_THREADS;
+		threads = (blocks < nsize) ? blocks : nsize;
 		blocks = blocks / threads;
 		dim3 dimBlock(threads, 1, 1);
 		dim3 dimGrid(blocks, 1, 1);
