@@ -1,24 +1,28 @@
+ifeq ($(CUDA), True)
 CC=nvcc
-
-NVFLAGS = \
+CFLAGS = \
 -arch=sm_61 \
 -Xcompiler '-fPIC'
+SRCS = cuda/oistools.cu
+LFLAGS =
+OFLAGS = -dc
+else
+CC=gcc
+CFLAGS = -I./cpu/ -c
+LFLAGS = -lm
+OFLAGS =
+SRCS = cpu/oistools.c
+endif
 
-NVLFLAGS = \
-	-shared \
-	-L .
+liboistools.a : oistools.o
+ifeq ($(CUDA), True)
+	$(CC) $(CFLAGS) -lib $^ -o $@ $(LFLAGS)
+else
+	ar rcs $@ $^
+endif
 
-main : test.c libnvmas.so
-	g++ -L. -o $@ $< -lnvmas
-
-libnvmas.so : nvmas.o libdevice.a
-	$(CC) $(NVFLAGS) $(NVLFLAGS) -ldevice $< -o $@
-
-libdevice.a : device.o
-	$(CC) $(NVFLAGS) -lib $^ -o $@
-
-%.o : %.cu
-	$(CC) $(NVFLAGS) -dc $^
+oistools.o : $(SRCS)
+	$(CC) $(CFLAGS) $(OFLAGS) $^ $(LFLAGS)
 
 clean:
-	rm *.o *.so *.a main
+	rm liboistools.a oistools.o

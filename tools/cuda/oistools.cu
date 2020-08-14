@@ -1,69 +1,83 @@
 #include "oistools.h"
 
+#define MAX_THREADS 1024
+#define SMSIZE MAX_THREADS
+
 void fill_c_matrices_for_kernel(int k_height, int k_width, int deg, int n, int m, double* refimage, double* Conv);
 void fill_c_matrices_for_background(int n, int m, int bkg_deg, double* Conv_bkg);
-double multiply_and_sum(size_t nsize, double* C1, double* C2);
-double multiply_and_sum_mask(size_t nsize, double* C1, double* C2, char* mask);
+extern "C" __global__ void multiply_and_sum(double *d, size_t nlen, double* c1, double* c2);
+extern "C" __global__ void multiply_and_sum_mask(double *d, size_t nlen, double* c1, double* c2, char *mask);
 
 
-lin_system build_matrix_system(int n, int m, double* image, double* refimage,
+extern "C" lin_system build_matrix_system(int n, int m, double* image, double* refimage,
     int kernel_height, int kernel_width, int kernel_polydeg, int bkg_deg,
     char *mask)
 {
-    int kernel_size = kernel_height * kernel_width;
-    int img_size = n * m;
+    int kernel_len = kernel_height * kernel_width;
+    int img_len = n * m;
     int kpdeg = kernel_polydeg;
     int poly_degree = (kpdeg + 1) * (kpdeg + 2) / 2;
     int bkg_dof;
 
     bkg_dof = (bkg_deg + 1) * (bkg_deg + 2) / 2;
 
-    size_t conv_size = ((size_t) img_size) * (kernel_size * poly_degree + bkg_dof);
-    double* Conv = calloc(conv_size, sizeof(*Conv)); // TODO err on bad calloc
+    size_t conv_len = ((size_t) img_len) * (kernel_len * poly_degree + bkg_dof);
+    double* Conv = (double *) calloc(conv_len, sizeof(*Conv)); // TODO err on bad calloc
 
     fill_c_matrices_for_kernel(kernel_height, kernel_width, kernel_polydeg, n, m, refimage, Conv);
     double* Conv_bkg;
     if (bkg_deg != -1) {
-        Conv_bkg = Conv + img_size * kernel_size * poly_degree;
+        Conv_bkg = Conv + img_len * kernel_len * poly_degree;
         fill_c_matrices_for_background(n, m, bkg_deg, Conv_bkg);
     }
 
-    int total_dof = kernel_size * poly_degree + bkg_dof;
+    int total_dof = kernel_len * poly_degree + bkg_dof;
 	size_t M_size = ((size_t) total_dof) * total_dof * sizeof(double);
 	size_t b_size = ((size_t) total_dof) * sizeof(double);
-    double* M = malloc(M_size);
-    double* b = malloc(b_size);
 
-    if (mask != NULL) {
-        for (size_t i = 0; i < total_dof; i++) {
-            double* C1 = Conv + i * img_size;
-            for (size_t j = i; j < total_dof; j++) {
-                double* C2 = Conv + j * img_size;
-                M[i * total_dof + j] = multiply_and_sum_mask(img_size, C1, C2, mask);
-                M[j * total_dof + i] = M[i * total_dof + j];
-            }
-            b[i] = multiply_and_sum_mask(img_size, image, C1, mask);
-        }
-    } else {
-        for (size_t i = 0; i < total_dof; i++) {
-            double* C1 = Conv + i * img_size;
-            for (size_t j = i; j < total_dof; j++) {
-                double* C2 = Conv + j * img_size;
-                M[i * total_dof + j] = multiply_and_sum(img_size, C1, C2);
-                M[j * total_dof + i] = M[i * total_dof + j];
-            }
-            b[i] = multiply_and_sum(img_size, image, C1);
-        }
-    }
+	double *d_M, *d_b, *d_Conv, *d_img;
+	char *d_m;
+	cudaMalloc(&d_M, M_size);
+	cudaMalloc(&d_b, b_size);
+	cudaMalloc(&d_Conv, conv_len * sizeof(double));
+	cudaMalloc(&d_img, img_len * sizeof(double));
+	if(mask) {
+		cudaMalloc(&d_m, conv_len * sizeof(char));
+		cudaMemcpy(d_m, mask, img_len * sizeof(double), cudaMemcpyHostToDevice);
+	}
+	cudaMemcpy(d_Conv, Conv, conv_len * sizeof(double), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_img, image, conv_len * sizeof(double), cudaMemcpyHostToDevice);
 
-    free(Conv);
+	dim3 dimBlock(MAX_THREADS, 1, 1);
+	dim3 dimGrid(img_len / MAX_THREADS + 1, 1, 1);
+
+	for(size_t i = 0; i < total_dof; i++) {
+		double* d_c1 = d_Conv + i * img_len;
+		for(size_t j = i; j < total_dof; j++) {
+			double *d_c2 = d_Conv + j * img_len;
+			if(mask) multiply_and_sum_mask<<<dimGrid, dimBlock, SMSIZE>>>(d_M + i * total_dof + j, img_len, d_c1, d_c2, d_m);
+			else multiply_and_sum<<<dimGrid, dimBlock, SMSIZE>>>(d_M + i * total_dof + j, img_len, d_c1, d_c2);
+			d_M[j * total_dof + i] = d_M[i * total_dof + j];
+		}
+		if(mask) multiply_and_sum_mask<<<dimGrid, dimBlock, SMSIZE>>>(d_b + i, img_len, image, d_c1, d_m);
+		else multiply_and_sum<<<dimGrid, dimBlock, SMSIZE>>>(d_b + i, img_len, image, d_c1);
+	}
+
+	double *M = (double *) malloc(M_size);
+	double *b = (double *) malloc(b_size);
+	cudaMemcpy(M, d_M, M_size, cudaMemcpyDeviceToHost);
+	cudaMemcpy(b, d_b, b_size, cudaMemcpyDeviceToHost);
+	cudaFree(d_M);
+	cudaFree(d_b);
+	cudaFree(d_Conv);
+	cudaFree(d_img);
+
     lin_system the_system = {total_dof, M, b};
-
     return the_system;
 }
 
 
-void convolve2d_adaptive(int n, int m, double* image,
+extern "C" void convolve2d_adaptive(int n, int m, double* image,
 		 
                             int kernel_height, int kernel_width,
                             int kernel_polydeg, double* kernel,
@@ -171,19 +185,33 @@ void fill_c_matrices_for_background(int n, int m, int bkg_deg, double* Conv_bkg)
     return;
 }
 
-double multiply_and_sum(size_t nsize, double* C1, double* C2) {
-    double result = 0.0;
-    for (size_t i = 0; i < nsize; i++) {
-        result += C1[i] * C2[i];
-    }
-    return result;
+extern "C" __global__ void multiply_and_sum(double *d, size_t nlen, double *c1, double *c2) {
+	extern __shared__ double sm[];
+	uint tid = threadIdx.x;
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	sm[tid] = i<nlen ? c1[i] * c2[i] : 0; // copy to SM
+	__syncthreads();
+	for (unsigned int s = blockDim.x / 2; s > 0; s>>=1) {
+		if(tid < s) {
+			sm[tid] += sm[tid + s];
+		}
+		__syncthreads();
+	}
+	if (tid == 0) atomicAdd(d, sm[0]);
+	// d[blockIdx.x] is the sum of the block
 }
 
-
-double multiply_and_sum_mask(size_t nsize, double* C1, double* C2, char* mask) {
-    double result = 0.0;
-    for (size_t i = 0; i < nsize; i++) {
-        if (mask[i] == 0) result += C1[i] * C2[i];
-    }
-    return result;
+extern "C" __global__ void multiply_and_sum_mask(double *d, size_t nlen, double *c1, double *c2, char *mask) {
+	extern __shared__ double sm[];
+	uint tid = threadIdx.x;
+	uint i = blockIdx.x * blockDim.x + threadIdx.x;
+	sm[tid] = (mask[i] || i >= nlen) ? 0 : c1[i] * c2[i]; // copy to SM
+	__syncthreads();
+	for (unsigned int s = blockDim.x / 2; s > 0; s>>=1) {
+		if(tid < s) {
+			sm[tid] += sm[tid + s];
+		}
+		__syncthreads();
+	}
+	if (tid == 0) atomicAdd(d, sm[0]);
 }
