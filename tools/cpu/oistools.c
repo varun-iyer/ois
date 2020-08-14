@@ -1,9 +1,9 @@
 #include "oistools.h"
 
-extern double multiply_and_sum(size_t nsize, double* C1, double* C2);
-extern double multiply_and_sum_mask(size_t nsize, double* C1, double* C2, char* mask);
 void fill_c_matrices_for_kernel(int k_height, int k_width, int deg, int n, int m, double* refimage, double* Conv);
 void fill_c_matrices_for_background(int n, int m, int bkg_deg, double* Conv_bkg);
+double multiply_and_sum(size_t nsize, double* C1, double* C2);
+double multiply_and_sum_mask(size_t nsize, double* C1, double* C2, char* mask);
 
 
 lin_system build_matrix_system(int n, int m, double* image, double* refimage,
@@ -28,14 +28,17 @@ lin_system build_matrix_system(int n, int m, double* image, double* refimage,
         fill_c_matrices_for_background(n, m, bkg_deg, Conv_bkg);
     }
 
-    //Create matrices M and vector b
-	// Everything below should be done fully on the GPU to minimize number of 
-	// transfers
     int total_dof = kernel_size * poly_degree + bkg_dof;
 	size_t M_size = ((size_t) total_dof) * total_dof * sizeof(double);
 	size_t b_size = ((size_t) total_dof) * sizeof(double);
     double* M = malloc(M_size);
     double* b = malloc(b_size);
+#if CUDA
+    //Create matrices M and vector b
+	// Everything below should be done fully on the GPU to minimize number of 
+	// transfers
+	d_convolve(image, image_len, Conv, M, b, conv_size * sizeof(double), total_dof, mask);
+#else
     if (mask != NULL) {
         for (size_t i = 0; i < total_dof; i++) {
             double* C1 = Conv + i * img_size;
@@ -59,6 +62,7 @@ lin_system build_matrix_system(int n, int m, double* image, double* refimage,
     }
 
     free(Conv);
+#endif
     lin_system the_system = {total_dof, M, b};
 
     return the_system;
@@ -66,6 +70,7 @@ lin_system build_matrix_system(int n, int m, double* image, double* refimage,
 
 
 void convolve2d_adaptive(int n, int m, double* image,
+		 
                             int kernel_height, int kernel_width,
                             int kernel_polydeg, double* kernel,
                             double* Conv)
@@ -170,4 +175,21 @@ void fill_c_matrices_for_background(int n, int m, int bkg_deg, double* Conv_bkg)
     } // exp_x
 
     return;
+}
+
+double multiply_and_sum(size_t nsize, double* C1, double* C2) {
+    double result = 0.0;
+    for (size_t i = 0; i < nsize; i++) {
+        result += C1[i] * C2[i];
+    }
+    return result;
+}
+
+
+double multiply_and_sum_mask(size_t nsize, double* C1, double* C2, char* mask) {
+    double result = 0.0;
+    for (size_t i = 0; i < nsize; i++) {
+        if (mask[i] == 0) result += C1[i] * C2[i];
+    }
+    return result;
 }

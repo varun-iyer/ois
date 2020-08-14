@@ -7,6 +7,8 @@ OBJ = $(addprefix $(OBJ_DIR)/, test_ois_tools.o oistools.o)
 HEADERS = $(SRC_DIR)/ois_tools.h $(TEST_DIR)/test_ois_tools.h
 LIBS = -lm
 
+NVLFLAGS= -L./nvlib -lnvmas
+
 all: testois
 .PHONY: all clean
 
@@ -20,7 +22,11 @@ src/obj/oistools.o: src/oistools.c src/oistools.h $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c src/oistools.c -o $(OBJ_DIR)/oistools.o -L./nvlib -lnvmas
 
 testois: $(OBJ) src/tests/test_main.c
-	$(CC) $(CFLAGS) -I$(SRC_DIR) -I$(TEST_DIR) $(OBJ) $(TEST_DIR)/test_main.c -lm -o testois -L./nvlib -lnvmas
+	$(CC) $(CFLAGS) -I$(SRC_DIR) -I$(TEST_DIR) $(OBJ) $(TEST_DIR)/test_main.c -lm -o testois
+
+testnvlib: $(OBJ) nvlib/tests/test_main.c
+	$(CC) $(CFLAGS) -I$(SRC_DIR) -I$(TEST_DIR) $(OBJ) $(TEST_DIR)/test_main.c -lm -o testois $(NVLFLAGS)
+
 
 test:
 	./testois
