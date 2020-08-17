@@ -12,13 +12,13 @@ with open('ois.py', 'r') as f:
 cuda = True
 
 varconv = Extension('varconv',
-                    sources=['src/varconv.c', 'src/oistools.c', 'src/mat.c'],
-                    include_dirs = ['src'],
-                    library_dirs = ['nvlib/'],
-                    runtime_libraries = ['nvmas'] if cuda else [],
-                    libraries = ['m', 'nvmas'] if cuda else ['m'],
-                    extra_compile_args=["-std=c99",
-                        "-DCUDA={}".format(1 if cuda else 0)]
+                    sources=['src/varconv.c'],
+                    include_dirs = ['src', 'tools/cpu'],
+                    library_dirs = ['tools/',],
+                    runtime_library_dirs = ['tools/',],
+                    libraries = ['m', 'oistools'],
+                    # extra_objects = ['tools/oistools'],
+                    extra_compile_args=["-std=c99"]
 
         )
 

@@ -8,21 +8,23 @@ LFLAGS =
 OFLAGS = -dc
 else
 CC=gcc
-CFLAGS = -I./cpu/ -c
+CFLAGS = -I./cpu/ '-fPIC'
 LFLAGS = -lm
-OFLAGS =
+OFLAGS = -c
 SRCS = cpu/oistools.c
 endif
 
-liboistools.a : oistools.o
-ifeq ($(CUDA), True)
-	$(CC) $(CFLAGS) -lib $^ -o $@ $(LFLAGS)
-else
-	ar rcs $@ $^
-endif
+liboistools.so : oistools.o
+	$(CC) $(CFLAGS) -shared $^ -o $@ $(LFLAGS)
+# ifeq ($(CUDA), True)
+	# $(CC) -shared $^ -o $@ $(LFLAGS)
+# else
+	# ar rcs $@ $^
+	# $(CC) -shared $* -o
+# endif
 
 oistools.o : $(SRCS)
 	$(CC) $(CFLAGS) $(OFLAGS) $^ $(LFLAGS)
 
 clean:
-	rm liboistools.a oistools.o
+	rm liboistools.so oistools.o
