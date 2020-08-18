@@ -2,7 +2,7 @@ CUDA_CC=nvcc
 CUDA_CFLAGS = \
 -arch=sm_61 \
 -Xcompiler '-fPIC'
-CUDA_SRCS = cuda/oistools.cu cuda/device.cu
+CUDA_SRCS = cuda/oistools.cu
 CUDA_LFLAGS = -lcudart
 CUDA_OFLAGS = -dc
 
@@ -20,19 +20,16 @@ default : cuda_shared
 cpu_shared : cpu_oistools.o
 	$(CC) $(CFLAGS) -shared $^ -o $(SHARED) $(LFLAGS)
 
-cuda_shared : cuda_oistools.o cuda_device.o
+cuda_shared : cuda_oistools.o
 	$(CUDA_CC) $(CUDA_CFLAGS) -shared $^ -o $(SHARED) $(CUDA_LFLAGS)
 
 cpu_static : cpu_oistools.o
 	ar rcs $(STATIC) $^
 
-cuda_static : cuda_oistools.o cuda_device.o
+cuda_static : cuda_oistools.o
 	$(CUDA_CC) -arch=sm_61 -lib $^ -o $(STATIC) $(CUDA_LFLAGS)
 
-cuda_oistools.o : cuda/oistools.cu
-	$(CUDA_CC) -o $@ $(CUDA_CFLAGS) $(CUDA_OFLAGS) $^ $(CUDA_LFLAGS)
-
-cuda_device.o : cuda/device.cu
+cuda_oistools.o : $(CUDA_SRCS)
 	$(CUDA_CC) -o $@ $(CUDA_CFLAGS) $(CUDA_OFLAGS) $^ $(CUDA_LFLAGS)
 
 cpu_oistools.o : $(SRCS)

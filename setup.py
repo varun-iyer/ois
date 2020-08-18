@@ -18,7 +18,7 @@ varconv = Extension('varconv',
                     runtime_library_dirs = ['tools/',],
                     libraries = ['m', 'oistools'],
                     runtime_libraries = ['oistools'],
-                    extra_compile_args=["-std=c99"],
+                    extra_compile_args=["-std=c99","-g"],
         )
 
 setup(name='ois',
