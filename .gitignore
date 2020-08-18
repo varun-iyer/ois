@@ -10,4 +10,5 @@ ois.egg-info
 *.sublime-project
 *.sublime-workspace
 *.so
+*.o
 *.swp

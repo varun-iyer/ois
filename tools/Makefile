@@ -1,13 +1,14 @@
 CUDA_CC=nvcc
 CUDA_CFLAGS = \
 -arch=sm_61 \
--Xcompiler '-fPIC'
+-Xcompiler '-fPIC' \
+-g
 CUDA_SRCS = cuda/oistools.cu
 CUDA_LFLAGS = -lcudart
 CUDA_OFLAGS = -dc
 
 CC=gcc
-CFLAGS = -I./cpu/ '-fPIC'
+CFLAGS = -I./cpu/ '-fPIC' -g
 LFLAGS = -lm
 OFLAGS = -c
 SRCS = cpu/oistools.c

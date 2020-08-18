@@ -1,4 +1,5 @@
 #include "oistools.h"
+#include "cuda_helper.h"
 
 #define MAX_THREADS 1024
 #define SMSIZE MAX_THREADS
@@ -36,16 +37,16 @@ extern "C" lin_system build_matrix_system(int n, int m, double* image, double* r
 
 	double *d_M, *d_b, *d_Conv, *d_img;
 	char *d_m;
-	cudaMalloc(&d_M, M_size);
-	cudaMalloc(&d_b, b_size);
-	cudaMalloc(&d_Conv, conv_len * sizeof(double));
-	cudaMalloc(&d_img, img_len * sizeof(double));
+	CUDA_ERRCHK(cudaMalloc(&d_M, M_size));
+	CUDA_ERRCHK(cudaMalloc(&d_b, b_size));
+	CUDA_ERRCHK(cudaMalloc(&d_Conv, conv_len * sizeof(double)));
+	CUDA_ERRCHK(cudaMalloc(&d_img, img_len * sizeof(double)));
 	if(mask) {
-		cudaMalloc(&d_m, conv_len * sizeof(char));
-		cudaMemcpy(d_m, mask, img_len * sizeof(double), cudaMemcpyHostToDevice);
+		CUDA_ERRCHK(cudaMalloc(&d_m, conv_len * sizeof(char)));
+		CUDA_ERRCHK(cudaMemcpy(d_m, mask, img_len * sizeof(double), cudaMemcpyHostToDevice));
 	}
-	cudaMemcpy(d_Conv, Conv, conv_len * sizeof(double), cudaMemcpyHostToDevice);
-	cudaMemcpy(d_img, image, conv_len * sizeof(double), cudaMemcpyHostToDevice);
+	CUDA_ERRCHK(cudaMemcpy(d_Conv, Conv, conv_len * sizeof(double), cudaMemcpyHostToDevice));
+	CUDA_ERRCHK(cudaMemcpy(d_img, image, img_len * sizeof(double), cudaMemcpyHostToDevice));
 
 	dim3 dimBlock(MAX_THREADS, 1, 1);
 	dim3 dimGrid(img_len / MAX_THREADS + 1, 1, 1);
@@ -64,12 +65,12 @@ extern "C" lin_system build_matrix_system(int n, int m, double* image, double* r
 
 	double *M = (double *) malloc(M_size);
 	double *b = (double *) malloc(b_size);
-	cudaMemcpy(M, d_M, M_size, cudaMemcpyDeviceToHost);
-	cudaMemcpy(b, d_b, b_size, cudaMemcpyDeviceToHost);
-	cudaFree(d_M);
-	cudaFree(d_b);
-	cudaFree(d_Conv);
-	cudaFree(d_img);
+	CUDA_ERRCHK(cudaMemcpy(M, d_M, M_size, cudaMemcpyDeviceToHost));
+	CUDA_ERRCHK(cudaMemcpy(b, d_b, b_size, cudaMemcpyDeviceToHost));
+	CUDA_ERRCHK(cudaFree(d_M));
+	CUDA_ERRCHK(cudaFree(d_b));
+	CUDA_ERRCHK(cudaFree(d_Conv));
+	CUDA_ERRCHK(cudaFree(d_img));
 
     lin_system the_system = {total_dof, M, b};
     return the_system;
