@@ -60,7 +60,7 @@ extern "C" lin_system build_matrix_system(int n, int m, double* image, double* r
 			cudaMemcpy(d_M + j * total_dof + i, d_M + i * total_dof + j, sizeof(double), cudaMemcpyDeviceToDevice);
 		}
 		if(mask) multiply_and_sum_mask<<<dimGrid, dimBlock, SMSIZE>>>(d_b + i, img_len, image, d_c1, d_m);
-		else multiply_and_sum<<<dimGrid, dimBlock, SMSIZE>>>(d_b + i, img_len, image, d_c1);
+		else multiply_and_sum<<<dimGrid, dimBlock, SMSIZE>>>(d_b + i, img_len, d_img, d_c1);
 	}
 
 	double *M = (double *) malloc(M_size);
