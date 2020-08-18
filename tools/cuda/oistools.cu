@@ -2,7 +2,7 @@
 #include "cuda_helper.h"
 
 #define MAX_THREADS 1024
-#define SMSIZE MAX_THREADS
+#define SMSIZE (MAX_THREADS * sizeof(double))
 
 void fill_c_matrices_for_kernel(int k_height, int k_width, int deg, int n, int m, double* refimage, double* Conv);
 void fill_c_matrices_for_background(int n, int m, int bkg_deg, double* Conv_bkg);
@@ -57,7 +57,7 @@ extern "C" lin_system build_matrix_system(int n, int m, double* image, double* r
 			double *d_c2 = d_Conv + j * img_len;
 			if(mask) multiply_and_sum_mask<<<dimGrid, dimBlock, SMSIZE>>>(d_M + i * total_dof + j, img_len, d_c1, d_c2, d_m);
 			else multiply_and_sum<<<dimGrid, dimBlock, SMSIZE>>>(d_M + i * total_dof + j, img_len, d_c1, d_c2);
-			d_M[j * total_dof + i] = d_M[i * total_dof + j];
+			cudaMemcpy(d_M + j * total_dof + i, d_M + i * total_dof + j, sizeof(double), cudaMemcpyDeviceToDevice);
 		}
 		if(mask) multiply_and_sum_mask<<<dimGrid, dimBlock, SMSIZE>>>(d_b + i, img_len, image, d_c1, d_m);
 		else multiply_and_sum<<<dimGrid, dimBlock, SMSIZE>>>(d_b + i, img_len, image, d_c1);
@@ -189,7 +189,7 @@ extern "C" __global__ void multiply_and_sum(double *d, size_t nlen, double *c1, 
 	extern __shared__ double sm[];
 	uint tid = threadIdx.x;
 	uint i = blockIdx.x * blockDim.x + threadIdx.x;
-	sm[tid] = i<nlen ? c1[i] * c2[i] : 0; // copy to SM
+	sm[tid] = (i < nlen) ? c1[i] * c2[i] : 0; // copy to SM
 	__syncthreads();
 	for (unsigned int s = blockDim.x / 2; s > 0; s>>=1) {
 		if(tid < s) {
