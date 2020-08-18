@@ -1,30 +1,42 @@
-ifeq ($(CUDA), True)
-CC=nvcc
-CFLAGS = \
+CUDA_CC=nvcc
+CUDA_CFLAGS = \
 -arch=sm_61 \
 -Xcompiler '-fPIC'
-SRCS = cuda/oistools.cu
-LFLAGS =
-OFLAGS = -dc
-else
+CUDA_SRCS = cuda/oistools.cu cuda/device.cu
+CUDA_LFLAGS = -lcudart
+CUDA_OFLAGS = -dc
+
 CC=gcc
 CFLAGS = -I./cpu/ '-fPIC'
 LFLAGS = -lm
 OFLAGS = -c
 SRCS = cpu/oistools.c
-endif
 
-liboistools.so : oistools.o
-	$(CC) $(CFLAGS) -shared $^ -o $@ $(LFLAGS)
-# ifeq ($(CUDA), True)
-	# $(CC) -shared $^ -o $@ $(LFLAGS)
-# else
-	# ar rcs $@ $^
-	# $(CC) -shared $* -o
-# endif
+STATIC = liboistools.a
+SHARED = liboistools.so
 
-oistools.o : $(SRCS)
-	$(CC) $(CFLAGS) $(OFLAGS) $^ $(LFLAGS)
+default : cuda_shared
+
+cpu_shared : cpu_oistools.o
+	$(CC) $(CFLAGS) -shared $^ -o $(SHARED) $(LFLAGS)
+
+cuda_shared : cuda_oistools.o cuda_device.o
+	$(CUDA_CC) $(CUDA_CFLAGS) -shared $^ -o $(SHARED) $(CUDA_LFLAGS)
+
+cpu_static : cpu_oistools.o
+	ar rcs $(STATIC) $^
+
+cuda_static : cuda_oistools.o cuda_device.o
+	$(CUDA_CC) -arch=sm_61 -lib $^ -o $(STATIC) $(CUDA_LFLAGS)
+
+cuda_oistools.o : cuda/oistools.cu
+	$(CUDA_CC) -o $@ $(CUDA_CFLAGS) $(CUDA_OFLAGS) $^ $(CUDA_LFLAGS)
+
+cuda_device.o : cuda/device.cu
+	$(CUDA_CC) -o $@ $(CUDA_CFLAGS) $(CUDA_OFLAGS) $^ $(CUDA_LFLAGS)
+
+cpu_oistools.o : $(SRCS)
+	$(CC) -o $@ $(CFLAGS) $(OFLAGS) $^ $(LFLAGS)
 
 clean:
-	rm liboistools.so oistools.o
+	-@rm *.a *.so *.o

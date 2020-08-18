@@ -1,13 +1,11 @@
 #include "oistools.h"
+#include "device.h"
 
 #define MAX_THREADS 1024
 #define SMSIZE MAX_THREADS
 
 void fill_c_matrices_for_kernel(int k_height, int k_width, int deg, int n, int m, double* refimage, double* Conv);
 void fill_c_matrices_for_background(int n, int m, int bkg_deg, double* Conv_bkg);
-extern "C" __global__ void multiply_and_sum(double *d, size_t nlen, double* c1, double* c2);
-extern "C" __global__ void multiply_and_sum_mask(double *d, size_t nlen, double* c1, double* c2, char *mask);
-
 
 extern "C" lin_system build_matrix_system(int n, int m, double* image, double* refimage,
     int kernel_height, int kernel_width, int kernel_polydeg, int bkg_deg,
@@ -183,35 +181,4 @@ void fill_c_matrices_for_background(int n, int m, int bkg_deg, double* Conv_bkg)
     } // exp_x
 
     return;
-}
-
-extern "C" __global__ void multiply_and_sum(double *d, size_t nlen, double *c1, double *c2) {
-	extern __shared__ double sm[];
-	uint tid = threadIdx.x;
-	uint i = blockIdx.x * blockDim.x + threadIdx.x;
-	sm[tid] = i<nlen ? c1[i] * c2[i] : 0; // copy to SM
-	__syncthreads();
-	for (unsigned int s = blockDim.x / 2; s > 0; s>>=1) {
-		if(tid < s) {
-			sm[tid] += sm[tid + s];
-		}
-		__syncthreads();
-	}
-	if (tid == 0) atomicAdd(d, sm[0]);
-	// d[blockIdx.x] is the sum of the block
-}
-
-extern "C" __global__ void multiply_and_sum_mask(double *d, size_t nlen, double *c1, double *c2, char *mask) {
-	extern __shared__ double sm[];
-	uint tid = threadIdx.x;
-	uint i = blockIdx.x * blockDim.x + threadIdx.x;
-	sm[tid] = (mask[i] || i >= nlen) ? 0 : c1[i] * c2[i]; // copy to SM
-	__syncthreads();
-	for (unsigned int s = blockDim.x / 2; s > 0; s>>=1) {
-		if(tid < s) {
-			sm[tid] += sm[tid + s];
-		}
-		__syncthreads();
-	}
-	if (tid == 0) atomicAdd(d, sm[0]);
 }
