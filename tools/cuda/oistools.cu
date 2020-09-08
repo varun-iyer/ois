@@ -71,6 +71,7 @@ extern "C" lin_system build_matrix_system(int n, int m, double* image, double* r
 	CUDA_ERRCHK(cudaFree(d_b));
 	CUDA_ERRCHK(cudaFree(d_Conv));
 	CUDA_ERRCHK(cudaFree(d_img));
+	free(Conv);
 	if(mask) CUDA_ERRCHK(cudaFree(d_m));
 
     lin_system the_system = {total_dof, M, b};
